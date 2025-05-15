@@ -8,14 +8,21 @@ body {
 .mdl-layout__header {
   background-color: #263238;
   color: white;
+  min-height: 64px; /* 最小高さを設定 */
+  height: auto; /* 高さを自動調整 */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 16px 0; /* 上下の余白を追加 */
+  overflow-y: auto; /* 内容が最大高さを超えた場合にスクロールバーを表示 */
 }
 
 .mdl-layout__header-row {
-  padding: 0 16px;
+  padding: 16px 16px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap; /* 必要に応じて折り返し */
 }
-
 .mdl-layout-title {
   font-size: 24px;
   font-weight: bold;
@@ -32,5 +39,5 @@ body {
 
 #three-canvas-container {
   width: 100vw;
-  height: calc(100vh - 120px);
+  height: calc(100vh - 120px); /* 初期値として設定、JavaScriptで動的に変更 */
 }

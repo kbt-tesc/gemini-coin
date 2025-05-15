@@ -33,7 +33,10 @@ async function init() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight - 120);
+    // メニュー領域の高さを考慮してレンダラーのサイズを設定
+    const header = document.querySelector('.mdl-layout__header');
+    const headerHeight = header ? header.offsetHeight : 120;
+    renderer.setSize(window.innerWidth, window.innerHeight - headerHeight);
     document.getElementById('three-canvas-container').appendChild(renderer.domElement);
     
     // カメラ位置
@@ -163,9 +166,11 @@ function getCoinColor(material) {
 
 // ウィンドウリサイズイベント
 function onWindowResize() {
-    camera.aspect = window.innerWidth / (window.innerHeight - 120);
+    const header = document.querySelector('.mdl-layout__header');
+    const headerHeight = header ? header.offsetHeight : 120;
+    camera.aspect = window.innerWidth / (window.innerHeight - headerHeight);
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight - 120);
+    renderer.setSize(window.innerWidth, window.innerHeight - headerHeight);
 }
 
 // マウスイベント
