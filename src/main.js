@@ -7,7 +7,7 @@ let world, physicsWorld;
 let scene, camera, renderer, controls;
 let base, walls = {}, coins = [];
 let coinCount = 0, coinLimit = 0;
-let coinMass = 4, coinFriction = 0.35, coinRestitution = 0.3;
+let coinMass = 4, coinFriction = 0.9, coinRestitution = 0.0;
 let tiltAngle = 0;
 let isMouseDown = false;
 let lastCoinTime = 0;
@@ -28,7 +28,10 @@ async function init() {
     await RAPIER.init();
     physicsWorld = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
     // 物理演算の精度を向上させるためにタイムステップを小さく設定
-    physicsWorld.maxTimestep = 1.0 / 120.0; // 120Hzで更新
+    physicsWorld.maxTimestep = 1.0 / 240.0; // 240Hzで更新して精度を向上
+    // 眠り機能を調整して、動きが小さい物体を早く停止させる
+    physicsWorld.integrationParameters.linearSleepThreshold = 0.001;
+    physicsWorld.integrationParameters.angularSleepThreshold = 0.001;
     
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -37,6 +40,8 @@ async function init() {
     const header = document.querySelector('.mdl-layout__header');
     const headerHeight = header ? header.offsetHeight : 120;
     renderer.setSize(window.innerWidth, window.innerHeight - headerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 影の品質を向上
     document.getElementById('three-canvas-container').appendChild(renderer.domElement);
     
     // カメラ位置
@@ -44,10 +49,15 @@ async function init() {
     camera.lookAt(0, 0, 0);
     
     // ライト
-    const ambientLight = new THREE.AmbientLight(0x404040);
+    const ambientLight = new THREE.AmbientLight(0xCCCCCC); // 環境光を明るく
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9); // 指向性ライトを明るく
     directionalLight.position.set(0, 1, 0);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 50;
     scene.add(directionalLight);
     
     // 土台と壁の作成
@@ -76,9 +86,10 @@ async function init() {
 // 土台の作成
 function createBase() {
     const geometry = new THREE.BoxGeometry(baseSize.width, baseSize.height, baseSize.depth);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00aa00 }); // 緑色
+    const material = new THREE.MeshPhongMaterial({ color: 0x00aa00 }); // 緑色、影をサポート
     base = new THREE.Mesh(geometry, material);
     base.position.y = 0;
+    base.receiveShadow = true;
     scene.add(base);
     
     const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
@@ -102,9 +113,10 @@ function createWalls() {
     
     wallData.forEach(data => {
         const geometry = new THREE.BoxGeometry(...data.size);
-        const material = new THREE.MeshBasicMaterial({ color: 0x808080 }); // 灰色
+        const material = new THREE.MeshPhongMaterial({ color: 0x808080 }); // 灰色、影をサポート
         const wall = new THREE.Mesh(geometry, material);
         wall.position.set(...data.pos);
+        wall.receiveShadow = true;
         scene.add(wall);
         
         const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed()
@@ -125,7 +137,7 @@ function createCoin() {
     const coinType = coinTypes[Math.floor(Math.random() * coinTypes.length)];
     const radius = coinType.diameter / 2;
     const geometry = new THREE.CylinderGeometry(radius, radius, coinType.thickness, 32);
-    const material = new THREE.MeshBasicMaterial({ color: getCoinColor(coinType.material) });
+    const material = new THREE.MeshPhongMaterial({ color: getCoinColor(coinType.material), shininess: 60 });
     const coin = new THREE.Mesh(geometry, material);
     
     const x = (Math.random() - 0.5) * baseSize.width * 0.8;
@@ -134,18 +146,20 @@ function createCoin() {
     coin.position.set(x, y, z);
     coin.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 18; // 0~10度の傾き
     coin.rotation.z = Math.random() * Math.PI * 2;
+    coin.castShadow = true;
+    coin.receiveShadow = true;
     scene.add(coin);
     
     const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(x, y, z)
-        .setAngularDamping(0.5)
-        .setLinearDamping(0.2);
+        .setAngularDamping(0.99)
+        .setLinearDamping(0.95);
     const rigidBody = physicsWorld.createRigidBody(rigidBodyDesc);
     const colliderDesc = RAPIER.ColliderDesc.cylinder(coinType.thickness / 2, radius)
         .setFriction(coinFriction)
         .setRestitution(coinRestitution)
         .setMass(coinType.mass)
-        .setContactSkin(0.001); // 衝突マージンを追加して貫通を防ぐ
+        .setContactSkin(0.002); // 衝突マージンを増やして貫通を防ぐ
     physicsWorld.createCollider(colliderDesc, rigidBody);
     coin.userData.physicsBody = rigidBody;
     coins.push(coin);
